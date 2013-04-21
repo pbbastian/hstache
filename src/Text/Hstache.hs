@@ -28,12 +28,9 @@ data HstacheTag = HstacheVariable T.Text
 
 data DelimiterSet = DelimiterSet T.Text T.Text
 
-hstacheTextP :: StateT DelimiterSet A.Parser HstacheTag
-hstacheTextP = do
-  DelimiterSet opening _ <- get
-  HstacheText <$> T.pack <$> lift (A.manyTill A.anyChar $ A.string opening)
+type HstacheTagParser = StateT DelimiterSet A.Parser HstacheTag
 
-hstacheSetDelimiterP :: StateT DelimiterSet A.Parser HstacheTag
+hstacheSetDelimiterP :: HstacheTagParser
 hstacheSetDelimiterP = do
   DelimiterSet opening closing <- get
   opening' <- lift $ opening .*> A.char '=' *> A.takeWhile1 (/= ' ')
@@ -41,14 +38,7 @@ hstacheSetDelimiterP = do
   put $ DelimiterSet opening' closing'
   return $ HstacheSetDelimiters opening' closing'
 
--- hstacheTextP (DelimiterSet opening _) = HstacheText <$> T.pack <$> (A.manyTill A.anyChar $ A.string opening)
-
---hstacheTagP :: (A.Parser a) -> DelimiterSet -> A.Parser a
---hstacheTagP p (DelimiterSet opening closing) = opening .*>
-
-sumP :: StateT Int (A.Parser) Int
-sumP = do
-  n' <- lift A.digit
-  let n = digitToInt n'
-  get >>= put . (+n)
-  return n
+hstacheTextP :: HstacheTagParser
+hstacheTextP = do
+  DelimiterSet opening _ <- get
+  HstacheText <$> T.pack <$> lift (A.manyTill A.anyChar $ A.string opening)
