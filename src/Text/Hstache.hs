@@ -9,33 +9,35 @@ import           Data.Attoparsec.Text           ((.*>), (<*.))
 import qualified Data.Attoparsec.Text           as A
 import qualified Data.Text                      as T
 
-data HstacheToken = HstacheStartDelimiter
-                  | HstacheEndDelimiter
-                  | HstachePound
-                  | HstacheSlash
-                  | HstacheCaret
-                  | HstacheBang
-                  | HstacheGT
+data Event = EventVariable T.Text
+           | EventUnescapedVariable T.Text
+           | EventBeginSection T.Text
+           | EventEndSection T.Text
+           | EventBeginInvertedSection T.Text
+           | EventEndInvertedSection T.Text
+           | EventPartial T.Text
+           | EventDelimiterSet T.Text T.Text
+           | EventText T.Text
 
-data HstacheTag = HstacheVariable T.Text
-                | HstacheUnescapedVariable T.Text
-                | HstacheSection T.Text HstacheTag
-                | HstacheInvertedSection T.Text HstacheTag
-                | HstachePartial T.Text
-                | HstacheSetDelimiters T.Text T.Text
-                | HstacheText T.Text
+data HstacheDocument = HstacheVariable T.Text
+                     | HstacheUnescapedVariable T.Text
+                     | HstacheSection T.Text HstacheDocument
+                     | HstacheInvertedSection T.Text HstacheDocument
+                     | HstachePartial T.Text
+                     | HstacheSetDelimiters T.Text T.Text
+                     | HstacheText T.Text
 
 data DelimiterSet = DelimiterSet T.Text T.Text
 
-type HstacheTagParser = StateT DelimiterSet A.Parser HstacheTag
+type HstacheDocumentParser = StateT DelimiterSet A.Parser HstacheDocument
 
-hstacheVariableP :: HstacheTagParser
+hstacheVariableP :: HstacheDocumentParser
 hstacheVariableP = do
   DelimiterSet opening closing <- get
   name <- lift $ fmap T.pack $ opening .*> (A.manyTill A.anyChar $ A.string closing) <*. closing
   return $ HstacheVariable name
 
-hstacheSetDelimiterP :: HstacheTagParser
+hstacheSetDelimiterP :: HstacheDocumentParser
 hstacheSetDelimiterP = do
   DelimiterSet opening closing <- get
   opening' <- lift $ opening .*> A.char '=' *> A.takeWhile1 (/= ' ') <* A.char ' '
@@ -43,7 +45,7 @@ hstacheSetDelimiterP = do
   put $ DelimiterSet opening' closing'
   return $ HstacheSetDelimiters opening' closing'
 
-hstacheTextP :: HstacheTagParser
+hstacheTextP :: HstacheDocumentParser
 hstacheTextP = do
   DelimiterSet opening _ <- get
   HstacheText <$> T.pack <$> lift (A.manyTill A.anyChar $ A.string opening)
