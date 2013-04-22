@@ -29,23 +29,23 @@ data HstacheDocument = HstacheVariable T.Text
 
 data DelimiterSet = DelimiterSet T.Text T.Text
 
-type HstacheDocumentParser = StateT DelimiterSet A.Parser HstacheDocument
+type EventParser = StateT (T.Text, T.Text) A.Parser Event
 
-hstacheVariableP :: HstacheDocumentParser
+hstacheVariableP :: EventParser
 hstacheVariableP = do
-  DelimiterSet opening closing <- get
+  (opening, closing) <- get
   name <- lift $ fmap T.pack $ opening .*> (A.manyTill A.anyChar $ A.string closing) <*. closing
-  return $ HstacheVariable name
+  return $ EventVariable name
 
-hstacheSetDelimiterP :: HstacheDocumentParser
+hstacheSetDelimiterP :: EventParser
 hstacheSetDelimiterP = do
-  DelimiterSet opening closing <- get
+  (opening, closing) <- get
   opening' <- lift $ opening .*> A.char '=' *> A.takeWhile1 (/= ' ') <* A.char ' '
   closing' <- lift $ fmap T.pack $ A.manyTill A.anyChar $ A.string closing
-  put $ DelimiterSet opening' closing'
-  return $ HstacheSetDelimiters opening' closing'
+  put (opening', closing')
+  return $ EventDelimiterSet opening' closing'
 
-hstacheTextP :: HstacheDocumentParser
+hstacheTextP :: EventParser
 hstacheTextP = do
-  DelimiterSet opening _ <- get
-  HstacheText <$> T.pack <$> lift (A.manyTill A.anyChar $ A.string opening)
+  (opening, _) <- get
+  EventText <$> T.pack <$> lift (A.manyTill A.anyChar $ A.string opening)
