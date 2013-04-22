@@ -31,21 +31,21 @@ data DelimiterSet = DelimiterSet T.Text T.Text
 
 type EventParser = StateT (T.Text, T.Text) A.Parser Event
 
-hstacheVariableP :: EventParser
-hstacheVariableP = do
+variableParser :: EventParser
+variableParser = do
   (opening, closing) <- get
   name <- lift $ fmap T.pack $ opening .*> (A.manyTill A.anyChar $ A.string closing) <*. closing
   return $ EventVariable name
 
-hstacheSetDelimiterP :: EventParser
-hstacheSetDelimiterP = do
+delimiterSetParser :: EventParser
+delimiterSetParser = do
   (opening, closing) <- get
   opening' <- lift $ opening .*> A.char '=' *> A.takeWhile1 (/= ' ') <* A.char ' '
   closing' <- lift $ fmap T.pack $ A.manyTill A.anyChar $ A.string closing
   put (opening', closing')
   return $ EventDelimiterSet opening' closing'
 
-hstacheTextP :: EventParser
-hstacheTextP = do
+textParser :: EventParser
+textParser = do
   (opening, _) <- get
   EventText <$> T.pack <$> lift (A.manyTill A.anyChar $ A.string opening)
