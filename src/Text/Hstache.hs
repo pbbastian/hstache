@@ -31,17 +31,23 @@ data DelimiterSet = DelimiterSet T.Text T.Text
 
 type EventParser = StateT (T.Text, T.Text) A.Parser Event
 
+tagParser :: EventParser -> EventParser
+tagParser innerParser = do
+  (opening, closing) <- get
+  lift $ A.string opening
+  result <- innerParser
+  lift $ A.string closing
+  return result
+
 variableParser :: EventParser
 variableParser = do
-  (opening, closing) <- get
-  name <- lift $ fmap T.pack $ opening .*> (A.manyTill A.anyChar $ A.string closing) <*. closing
-  return $ EventVariable name
+  (_, closing) <- get
+  EventVariable <$> T.pack <$> lift (A.manyTill A.anyChar $ A.string closing)
 
 delimiterSetParser :: EventParser
 delimiterSetParser = do
-  (opening, closing) <- get
-  opening' <- lift $ opening .*> A.char '=' *> A.takeWhile1 (/= ' ') <* A.char ' '
-  closing' <- lift $ fmap T.pack $ A.manyTill A.anyChar $ A.string closing
+  opening' <- lift $ A.char '=' *> A.takeWhile1 (/= ' ')
+  closing' <- lift $ A.space *> A.takeWhile1 (/= '=') <* A.char '='
   put (opening', closing')
   return $ EventDelimiterSet opening' closing'
 
