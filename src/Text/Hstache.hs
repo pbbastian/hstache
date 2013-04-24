@@ -31,11 +31,14 @@ data DelimiterSet = DelimiterSet T.Text T.Text
 
 type EventParser = StateT (T.Text, T.Text) A.Parser Event
 
-tagParser :: EventParser -> EventParser
-tagParser innerParser = do
+tagParser :: EventParser
+tagParser = do
   (opening, closing) <- get
   lift $ A.string opening
-  result <- innerParser
+  result <- A.choice [ unescapedVariableParser1
+                     , unescapedVariableParser2
+                     , delimiterSetParser
+                     , variableParser ]
   lift $ A.string closing
   return result
 
@@ -47,11 +50,14 @@ variableParser = do
   (_, closing) <- get
   EventVariable <$> lift (tillText closing)
 
-unescapedVariableParser :: EventParser
-unescapedVariableParser = do
+unescapedVariableParser1 :: EventParser
+unescapedVariableParser1 = do
   (_, closing) <- get
-  EventVariable <$> lift (("& " .*> tillText closing)
-                          <|> (A.char '{' *> A.takeWhile1 (/= '}') <* A.char '}'))
+  EventVariable <$> lift ("& " .*> tillText closing)
+
+unescapedVariableParser2 :: EventParser
+unescapedVariableParser2 =
+  EventVariable <$> lift (A.char '{' *> A.takeWhile1 (/= '}') <* A.char '}')
 
 delimiterSetParser :: EventParser
 delimiterSetParser = do
