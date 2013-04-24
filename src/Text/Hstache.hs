@@ -17,6 +17,7 @@ data Event = EventVariable T.Text
            | EventPartial T.Text
            | EventDelimiterSet T.Text T.Text
            | EventText T.Text
+           deriving Show
 
 data HstacheDocument = HstacheVariable T.Text
                      | HstacheUnescapedVariable T.Text
@@ -25,32 +26,38 @@ data HstacheDocument = HstacheVariable T.Text
                      | HstachePartial T.Text
                      | HstacheSetDelimiters T.Text T.Text
                      | HstacheText T.Text
+                     deriving Show
 
 data DelimiterSet = DelimiterSet T.Text T.Text
 
 type EventParser = StateT (T.Text, T.Text) A.Parser Event
 
+eventParser :: StateT (T.Text, T.Text) A.Parser [Event]
+eventParser = many $ tagParser <|> textParser
+
 tagParser :: EventParser
 tagParser = do
   (opening, closing) <- get
   lift $ A.string opening
-  result <- A.choice [ unescapedVariableParser1
-                     , unescapedVariableParser2
-                     , beginSectionParser
-                     , endSectionParser
-                     , beginInvertedSectionParser
-                     , partialParser
-                     , delimiterSetParser
-                     , variableParser ]
-  lift $ A.string closing
+  result <- unescapedVariableParser1
+        <|> unescapedVariableParser2
+        <|> beginSectionParser
+        <|> endSectionParser
+        <|> beginInvertedSectionParser
+        <|> partialParser
+        <|> delimiterSetParser
+        <|> variableParser
   return result
 
 tillText :: T.Text -> A.Parser T.Text
-tillText closing = T.pack <$> (A.manyTill A.anyChar $ A.string closing)
+tillText closing = T.pack <$> (A.manyTill A.anyChar $ A.try $ A.string closing)
+
+mustaches :: StateT (T.Text, T.Text) A.Parser a -> A.Parser a
+mustaches = flip evalStateT ("{{", "}}")
 
 variableParser :: EventParser
 variableParser = do
-  (_, closing) <- get
+  (opening, closing) <- get
   EventVariable <$> lift (tillText closing)
 
 unescapedVariableParser1 :: EventParser
@@ -84,8 +91,9 @@ partialParser = do
 
 delimiterSetParser :: EventParser
 delimiterSetParser = do
+  (_, closing) <- get
   opening' <- lift $ A.char '=' *> A.takeWhile1 (/= ' ')
-  closing' <- lift $ A.space *> A.takeWhile1 (/= '=') <* A.char '='
+  closing' <- lift $ A.space *> A.takeWhile1 (/= '=') <* A.char '=' <*. closing
   put (opening', closing')
   return $ EventDelimiterSet opening' closing'
 
