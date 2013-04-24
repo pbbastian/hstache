@@ -14,7 +14,6 @@ data Event = EventVariable T.Text
            | EventBeginSection T.Text
            | EventEndSection T.Text
            | EventBeginInvertedSection T.Text
-           | EventEndInvertedSection T.Text
            | EventPartial T.Text
            | EventDelimiterSet T.Text T.Text
            | EventText T.Text
@@ -37,6 +36,10 @@ tagParser = do
   lift $ A.string opening
   result <- A.choice [ unescapedVariableParser1
                      , unescapedVariableParser2
+                     , beginSectionParser
+                     , endSectionParser
+                     , beginInvertedSectionParser
+                     , partialParser
                      , delimiterSetParser
                      , variableParser ]
   lift $ A.string closing
@@ -53,11 +56,31 @@ variableParser = do
 unescapedVariableParser1 :: EventParser
 unescapedVariableParser1 = do
   (_, closing) <- get
-  EventVariable <$> lift ("& " .*> tillText closing)
+  EventUnescapedVariable <$> lift ("& " .*> tillText closing)
 
 unescapedVariableParser2 :: EventParser
 unescapedVariableParser2 =
-  EventVariable <$> lift (A.char '{' *> A.takeWhile1 (/= '}') <* A.char '}')
+  EventUnescapedVariable <$> lift (A.char '{' *> A.takeWhile1 (/= '}') <* A.char '}')
+
+beginSectionParser :: EventParser
+beginSectionParser = do
+  (_, closing) <- get
+  EventBeginSection <$> lift (A.char '#' *> tillText closing)
+
+endSectionParser :: EventParser
+endSectionParser = do
+  (_, closing) <- get
+  EventEndSection <$> lift (A.char '/' *> tillText closing)
+
+beginInvertedSectionParser :: EventParser
+beginInvertedSectionParser = do
+  (_, closing) <- get
+  EventBeginInvertedSection <$> lift (A.char '^' *> tillText closing)
+
+partialParser :: EventParser
+partialParser = do
+  (_, closing) <- get
+  EventPartial <$> lift ("> " .*> tillText closing)
 
 delimiterSetParser :: EventParser
 delimiterSetParser = do
