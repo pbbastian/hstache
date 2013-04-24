@@ -39,18 +39,18 @@ tagParser innerParser = do
   lift $ A.string closing
   return result
 
-tillClosing :: T.Text -> A.Parser T.Text
-tillClosing closing = T.pack <$> (A.manyTill A.anyChar $ A.string closing)
+tillText :: T.Text -> A.Parser T.Text
+tillText closing = T.pack <$> (A.manyTill A.anyChar $ A.string closing)
 
 variableParser :: EventParser
 variableParser = do
   (_, closing) <- get
-  EventVariable <$> lift (tillClosing closing)
+  EventVariable <$> lift (tillText closing)
 
 unescapedVariableParser :: EventParser
 unescapedVariableParser = do
   (_, closing) <- get
-  EventVariable <$> lift (("& " .*> tillClosing closing)
+  EventVariable <$> lift (("& " .*> tillText closing)
                           <|> (A.char '{' *> A.takeWhile1 (/= '}') <* A.char '}'))
 
 delimiterSetParser :: EventParser
@@ -63,4 +63,4 @@ delimiterSetParser = do
 textParser :: EventParser
 textParser = do
   (opening, _) <- get
-  EventText <$> T.pack <$> lift (A.manyTill A.anyChar $ A.string opening)
+  EventText <$> lift (tillText opening)
